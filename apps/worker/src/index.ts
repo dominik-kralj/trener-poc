@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 export type Env = {
+  DB: D1Database;
   WHATSAPP_TOKEN: string;
   WHATSAPP_PHONE_NUMBER_ID: string;
   WHATSAPP_APP_SECRET: string;

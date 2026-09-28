@@ -9,12 +9,12 @@ A function takes the current state + an event and returns **decisions**: which m
 ## Domain model (POC)
 - `coach` — one coach, identified by phone number (from config)
 - `client` — phone (E.164), name
-- `slot` — `starts_at`, `duration_min`, `capacity` (1 for POC), `status`
+- `slot` — `starts_at`, `duration_min`, `status`, `offered_at` (null = draft the coach hasn't sent yet; capacity is always 1 in the POC, so no column)
 - `hold` — `slot_id`, `client_id`, `status`, `calendar_event_id` (set by the worker after sync, nullable)
 - `processed_message` — WhatsApp message ID (unique), used by the worker for dedupe
 
 ## State
-- **slot:** `open → held → confirmed`; `held → open` when the coach rejects
+- **slot:** `open → held → confirmed`; `held → open` when the coach rejects. A new coach slot message replaces unsent drafts (the only case a slot is deleted).
 - **hold:** `held → confirmed | rejected`
 
 ## Invariants (test these first)

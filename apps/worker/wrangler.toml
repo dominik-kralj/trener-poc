@@ -3,4 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# D1 binding added in issue #6.
+[[d1_databases]]
+binding = "DB"
+database_name = "trener-poc"
+# Placeholder for local dev. Before deploying (#12): `wrangler d1 create trener-poc` and paste the id here.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

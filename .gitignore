@@ -6,3 +6,6 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Real test phone numbers
+apps/worker/seed.sql
