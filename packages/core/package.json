@@ -1,0 +1,13 @@
+{
+  "name": "@trener/core",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@trener/shared": "workspace:*"
+  }
+}

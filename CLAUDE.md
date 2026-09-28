@@ -31,7 +31,7 @@ WhatsApp bot that takes over **session coordination** for individual sports coac
 Cloudflare Workers + Hono, D1 (plain SQL migrations), Anthropic TS SDK (`claude-haiku-4-5`), Zod, Google Calendar API, Vitest, pnpm workspaces. TypeScript `strict`, no `any`.
 
 ## How to work with me
-- I'm a frontend developer (React, TypeScript, Zod) learning backend and AI through this project. I build by hand to understand it.
-- Default to explaining, reviewing and pointing me in the right direction. Small snippets are fine; write full implementations only when I explicitly ask.
+- I'm a frontend developer (React, TypeScript, Zod). This is a POC to show a potential client. Speed matters more than me learning by hand.
+- Implement issues fully (code, tests, verify they run). Briefly explain non-obvious backend/AI decisions as you go.
 - Keep answers short and end with one concrete next step, not a menu of options.
 - If something adds scope beyond the POC flow (including suggesting a web UI), say so.
