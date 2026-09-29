@@ -4,5 +4,5 @@
     // Tests run in Node (Vitest + Miniflare), not in the Workers runtime.
     "types": ["node", "@cloudflare/workers-types"]
   },
-  "include": [".", "../src"]
+  "include": [".", "../src", "../scripts"]
 }

@@ -7,7 +7,8 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "db:migrate:local": "wrangler d1 migrations apply trener-poc --local",
-    "db:seed:local": "wrangler d1 execute trener-poc --local --file=./seed.sql"
+    "db:seed:local": "wrangler d1 execute trener-poc --local --file=./seed.sql",
+    "send:test": "tsx scripts/send-test.ts"
   },
   "dependencies": {
     "@trener/core": "workspace:*",
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260928.1",
     "@types/node": "^22",
+    "tsx": "^4.23.15",
     "wrangler": "^4.143.0"
   }
 }
