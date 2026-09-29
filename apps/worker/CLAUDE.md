@@ -26,7 +26,8 @@ wrangler.toml
 - AI only turns free text into structured data (e.g. the coach's slot message → slots). Everything else is deterministic.
 - Always validate output with the Zod schema from `packages/shared`. Invalid or unsure → ask the coach, never guess.
 - The bot never confirms anything on its own.
-- Keep an eval set of realistic Croatian messages (slang, typos) with expected outputs; rerun it after every prompt change.
+- Keep an eval set of realistic Croatian messages (slang, typos) with expected outputs; rerun it after every prompt change: `pnpm --filter @trener/worker eval` ([evals/parse-slots.eval.ts](evals/parse-slots.eval.ts)).
+- The model returns local date + time only; `src/ai/zagreb.ts` adds the offset (DST-safe). Past slots are rejected in code, not by the prompt.
 
 ## Google Calendar rules
 - **Write-only mirror.** Create an event only when a hold becomes `confirmed`. Never read the calendar back as state; D1 is the source of truth.
