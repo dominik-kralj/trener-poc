@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Hono } from "hono";
 import { parseSlotMessage } from "./ai/parse-slots";
+import { createGoogleCalendar } from "./calendar/google";
 import type { Env } from "./env";
 import { handleMessage, type FlowDeps } from "./flow/handle";
 import { webhookRoutes } from "./webhook/routes";
@@ -16,8 +17,12 @@ function flowDeps(env: Env): FlowDeps {
     coachPhone: env.COACH_PHONE,
     send: whatsapp.send,
     parseSlots: (text, now) => parseSlotMessage(anthropic, text, now),
-    // Google Calendar sync comes in #11.
-    createCalendarEvent: async (d) => console.log("calendar: not wired yet", JSON.stringify(d)),
+    calendar: createGoogleCalendar({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      refreshToken: env.GOOGLE_REFRESH_TOKEN,
+      calendarId: env.GOOGLE_CALENDAR_ID,
+    }),
     now: () => new Date().toISOString(),
     newId: () => crypto.randomUUID(),
   };

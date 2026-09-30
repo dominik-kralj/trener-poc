@@ -9,7 +9,8 @@
     "db:migrate:local": "wrangler d1 migrations apply trener-poc --local",
     "db:seed:local": "wrangler d1 execute trener-poc --local --file=./seed.sql",
     "send:test": "tsx scripts/send-test.ts",
-    "eval": "tsx evals/parse-slots.eval.ts"
+    "eval": "tsx evals/parse-slots.eval.ts",
+    "google:auth": "tsx scripts/google-auth.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",

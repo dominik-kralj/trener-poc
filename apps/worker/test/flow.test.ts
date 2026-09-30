@@ -1,6 +1,7 @@
 import type { OutgoingMessage } from "@trener/core";
 import type { ParsedSlots } from "@trener/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { NewEvent } from "../src/calendar/google";
 import { handleMessage, TEXT, type FlowDeps } from "../src/flow/handle";
 import type { IncomingMessage } from "../src/webhook/payload";
 import { resetDb, startTestDb } from "./d1";
@@ -28,9 +29,12 @@ beforeEach(async () => {
     .run();
 });
 
-function setup(parsed: ParsedSlots | Error = { kind: "slots", slots: [{ startsAt: WED_16, durationMin: 60 }, { startsAt: TUE_13, durationMin: 60 }] }) {
+function setup(
+  parsed: ParsedSlots | Error = { kind: "slots", slots: [{ startsAt: WED_16, durationMin: 60 }, { startsAt: TUE_13, durationMin: 60 }] },
+  calendarFails = { value: false },
+) {
   const sent: { to: string; message: OutgoingMessage }[] = [];
-  const calendar: unknown[] = [];
+  const calendar: NewEvent[] = [];
   let n = 0;
   const deps: FlowDeps = {
     db,
@@ -43,8 +47,12 @@ function setup(parsed: ParsedSlots | Error = { kind: "slots", slots: [{ startsAt
       if (parsed instanceof Error) throw parsed;
       return parsed;
     },
-    createCalendarEvent: async (d) => {
-      calendar.push(d);
+    calendar: {
+      createEvent: async (e) => {
+        if (calendarFails.value) throw new Error("google down");
+        calendar.push(e);
+        return `gcal-${e.holdId}`;
+      },
     },
     now: () => "2026-09-29T08:00:00.000Z",
     newId: () => `id-${++n}`,
@@ -114,7 +122,9 @@ describe("flow: the whole POC scenario", () => {
     out = drain();
     expect(out.find((o) => o.to === winner)!.message.body).toContain("Trener je potvrdio");
     expect(calendar).toHaveLength(1);
-    expect(calendar[0]).toMatchObject({ type: "createCalendarEvent", startsAt: WED_16, durationMin: 60 });
+    expect(calendar[0]).toMatchObject({ startsAt: WED_16, durationMin: 60 });
+    const stored = await db.prepare("SELECT calendar_event_id FROM hold").first<{ calendar_event_id: string }>();
+    expect(stored!.calendar_event_id).toBe(`gcal-${calendar[0]!.holdId}`);
     const slot = await db.prepare("SELECT status FROM slot WHERE id = ?1").bind(wed).first<{ status: string }>();
     expect(slot!.status).toBe("confirmed");
   });
@@ -133,6 +143,34 @@ describe("flow: the whole POC scenario", () => {
     expect(out.find((o) => o.to === MARKO)!.message.body).toContain("trener ne može");
     const slot = await db.prepare("SELECT status FROM slot WHERE id = ?1").bind(wed).first<{ status: string }>();
     expect(slot!.status).toBe("open");
+  });
+});
+
+describe("flow: calendar", () => {
+  it("keeps the confirmation when Google fails, tells the coach, retries on the coach's next message", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fails = { value: true };
+    const { text, tap, drain, choiceIds, calendar } = setup(undefined, fails);
+    await text(COACH, "x");
+    await tap(COACH, "send_offer");
+    drain();
+    await tap(MARKO, `pick:${await slotIdAt(WED_16)}`);
+    const confirm = choiceIds(drain().find((o) => o.to === COACH)!.message)[0]!;
+
+    await tap(COACH, confirm);
+    const out = drain();
+    expect(out.find((o) => o.to === MARKO)!.message.body).toContain("Trener je potvrdio");
+    expect(out.at(-1)).toEqual({ to: COACH, message: { kind: "text", body: expect.stringContaining("nisam uspio upisati") } });
+    const hold = await db.prepare("SELECT status, calendar_event_id FROM hold").first<{ status: string; calendar_event_id: string | null }>();
+    expect(hold).toEqual({ status: "confirmed", calendar_event_id: null });
+
+    // Google is back; any coach message triggers the retry.
+    fails.value = false;
+    await text(COACH, "sri 16");
+    expect(calendar).toHaveLength(1);
+    const after = await db.prepare("SELECT calendar_event_id FROM hold").first<{ calendar_event_id: string }>();
+    expect(after!.calendar_event_id).toMatch(/^gcal-/);
+    error.mockRestore();
   });
 });
 

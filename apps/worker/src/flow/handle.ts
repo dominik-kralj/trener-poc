@@ -1,5 +1,6 @@
 import {
   decide,
+  formatSlotLong,
   parseReplyId,
   replyToEvent,
   type Decision,
@@ -7,7 +8,8 @@ import {
   type OutgoingMessage,
 } from "@trener/core";
 import type { ParsedSlots } from "@trener/shared";
-import { applyWrites, loadState } from "../db/repo";
+import type { NewEvent } from "../calendar/google";
+import { applyWrites, loadState, setCalendarEventId } from "../db/repo";
 import type { IncomingMessage } from "../webhook/payload";
 import type { SendResult } from "../whatsapp/client";
 
@@ -17,8 +19,8 @@ export type FlowDeps = {
   coachPhone: string;
   send: (to: string, message: OutgoingMessage) => Promise<SendResult>;
   parseSlots: (text: string, now: string) => Promise<ParsedSlots>;
-  /** Executes a `createCalendarEvent` decision (#11). */
-  createCalendarEvent: (decision: Extract<Decision, { type: "createCalendarEvent" }>) => Promise<void>;
+  /** Google Calendar mirror. Returns the event ID; idempotent per hold. */
+  calendar: { createEvent: (event: NewEvent) => Promise<string> };
   now: () => string;
   newId: () => string;
 };
@@ -29,6 +31,8 @@ export const TEXT = {
   unknownSender: "Ovo je automatski asistent za dogovor termina. Za sve ostalo javi se treneru direktno.",
   coachUnsupported: "Mogu čitati samo tekst. Pošalji mi slobodne termine porukom, npr. \"srijeda 16, utorak 13\".",
   aiFailed: "Nešto je zapelo pri čitanju poruke. Pokušaj ponovno za minutu.",
+  calendarFailed: (what: string) =>
+    `${what} je potvrđen, ali ga nisam uspio upisati u Google Kalendar. Pokušat ću ponovno kad mi se sljedeći put javiš.`,
 };
 
 // A conflict means another pick won the slot between our read and write. Re-deciding on
@@ -36,6 +40,8 @@ export const TEXT = {
 const MAX_ATTEMPTS = 3;
 
 export async function handleMessage(message: IncomingMessage, deps: FlowDeps): Promise<void> {
+  // No cron in the POC: the coach's next message is the moment to retry failed calendar syncs.
+  if (message.from === deps.coachPhone) await retryPendingCalendar(deps);
   const event = await toEvent(message, deps);
   if (event) await runEvent(event, deps);
 }
@@ -101,6 +107,45 @@ async function runEvent(event: Event, deps: FlowDeps): Promise<void> {
 async function executeSideEffects(decisions: Decision[], deps: FlowDeps): Promise<void> {
   for (const d of decisions) {
     if (d.type === "sendMessage") await deps.send(d.to, d.message);
-    if (d.type === "createCalendarEvent") await deps.createCalendarEvent(d);
+  }
+  // After the messages: people hear "confirmed" first, a calendar problem (if any) second.
+  for (const d of decisions) {
+    if (d.type === "createCalendarEvent") await syncCalendar(d, deps);
+  }
+}
+
+/**
+ * A calendar failure never undoes the confirmation: D1 already says `confirmed`.
+ * Log it, tell the coach, and leave `calendar_event_id` empty so it's retried later.
+ */
+async function syncCalendar(event: NewEvent, deps: FlowDeps): Promise<void> {
+  try {
+    const eventId = await deps.calendar.createEvent(event);
+    await setCalendarEventId(deps.db, event.holdId, eventId);
+  } catch (error) {
+    console.error(`calendar: sync failed for hold ${event.holdId}`, error);
+    const what = `Trening ${event.clientName} (${formatSlotLong(event.startsAt)})`;
+    await deps.send(deps.coachPhone, { kind: "text", body: TEXT.calendarFailed(what) });
+  }
+}
+
+/** Confirmed holds without a calendar event: create them now, quietly. */
+async function retryPendingCalendar(deps: FlowDeps): Promise<void> {
+  const state = await loadState(deps.db, deps.coachPhone);
+  for (const hold of state.holds.filter((h) => h.status === "confirmed" && !h.calendarEventId)) {
+    const slot = state.slots.find((s) => s.id === hold.slotId);
+    const client = state.clients.find((c) => c.id === hold.clientId);
+    if (!slot || !client) continue;
+    try {
+      const eventId = await deps.calendar.createEvent({
+        holdId: hold.id,
+        clientName: client.name,
+        startsAt: slot.startsAt,
+        durationMin: slot.durationMin,
+      });
+      await setCalendarEventId(deps.db, hold.id, eventId);
+    } catch (error) {
+      console.error(`calendar: retry failed for hold ${hold.id}`, error);
+    }
   }
 }
