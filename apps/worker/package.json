@@ -10,7 +10,8 @@
     "db:seed:local": "wrangler d1 execute trener-poc --local --file=./seed.sql",
     "send:test": "tsx scripts/send-test.ts",
     "eval": "tsx evals/parse-slots.eval.ts",
-    "google:auth": "tsx scripts/google-auth.ts"
+    "google:auth": "tsx scripts/google-auth.ts",
+    "demo:reset": "wrangler d1 execute trener-poc --remote --command \"DELETE FROM hold; DELETE FROM slot;\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
